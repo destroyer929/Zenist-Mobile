@@ -1,0 +1,12 @@
+{
+  "total_providers": 7,
+  "providers": [
+    "androidx.core.content.FileProvider",
+    "androidx.startup.InitializationProvider",
+    "com.facebook.internal.FacebookInitProvider",
+    "com.google.firebase.provider.FirebaseInitProvider",
+    "com.squareup.picasso.PicassoProvider",
+    "com.todoist.slices.AppSliceProvider",
+    "io.sentry.android.core.SentryPerformanceProvider"
+  ]
+}

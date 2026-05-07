@@ -1,0 +1,127 @@
+{
+  "features": [
+    "android.hardware.location",
+    "android.hardware.location.gps",
+    "android.hardware.location.network",
+    "android.hardware.microphone",
+    "android.hardware.touchscreen"
+  ],
+  "libraries": [
+    "android.ext.adservices",
+    "androidx.window.extensions",
+    "androidx.window.sidecar",
+    "org.apache.http.legacy"
+  ],
+  "intent_filters_sample": {
+    "com.todoist.activity.SettingsActivity": {
+      "action": [
+        "android.intent.action.MAIN"
+      ],
+      "category": [
+        "android.intent.category.NOTIFICATION_PREFERENCES"
+      ]
+    },
+    "com.todoist.activity.QuickAddItemActivity": {
+      "action": [
+        "android.intent.action.MAIN"
+      ]
+    },
+    "com.todoist.activity.AddAsNoteActivity": {
+      "action": [
+        "android.intent.action.SEND"
+      ],
+      "category": [
+        "android.intent.category.DEFAULT"
+      ],
+      "data": [
+        {
+          "mimeType": "application/*"
+        },
+        {
+          "mimeType": "audio/*"
+        },
+        {
+          "mimeType": "image/*"
+        },
+        {
+          "mimeType": "text/*"
+        }
+      ]
+    },
+    "com.todoist.activity.AddFileAsItemProxyActivity": {
+      "action": [
+        "android.intent.action.SEND"
+      ],
+      "category": [
+        "android.intent.category.DEFAULT"
+      ],
+      "data": [
+        {
+          "mimeType": "application/*"
+        },
+        {
+          "mimeType": "audio/*"
+        },
+        {
+          "mimeType": "image/*"
+        }
+      ]
+    },
+    "com.todoist.activity.RouterActivity": {
+      "action": [
+        "android.intent.action.VIEW"
+      ],
+      "category": [
+        "android.intent.category.DEFAULT",
+        "android.intent.category.BROWSABLE"
+      ],
+      "data": [
+        {
+          "scheme": "todoist"
+        },
+        {
+          "scheme": "https",
+          "host": "todoist.com",
+          "pathPrefix": "/app"
+        },
+        {
+          "scheme": "https",
+          "host": "*.todoist.com",
+          "pathPrefix": "/app"
+        },
+        {
+          "scheme": "https",
+          "host": "todoist.com",
+          "pathPrefix": "/showTask"
+        },
+        {
+          "scheme": "https",
+          "host": "*.todoist.com",
+          "pathPrefix": "/showTask"
+        },
+        {
+          "scheme": "https",
+          "host": "todoist.com",
+          "pathPrefix": "/auth/join"
+        },
+        {
+          "scheme": "https",
+          "host": "*.todoist.com",
+          "pathPrefix": "/auth/join"
+        },
+        {
+          "scheme": "https"
+        },
+        {
+          "host": "todoist.com"
+        },
+        {
+          "pathPattern": "/.*/templates/.*"
+        },
+        {
+          "pathPattern": "/templates/.*"
+        }
+      ]
+    }
+  }
+}

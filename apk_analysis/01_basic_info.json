@@ -1,0 +1,10 @@
+{
+  "package_name": "com.todoist",
+  "app_name": "Todoist",
+  "version_name": "v11460",
+  "version_code": "11460",
+  "min_sdk": "24",
+  "target_sdk": "33",
+  "max_sdk": null,
+  "effective_target_sdk": 33
+}

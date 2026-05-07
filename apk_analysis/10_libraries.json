@@ -1,0 +1,17 @@
+{
+  "detected_libraries": {
+    "OkHttp": {
+      "package": "okhttp3",
+      "files_found": 2,
+      "sample_paths": [
+        "okhttp3/internal/publicsuffix/NOTICE",
+        "okhttp3/internal/publicsuffix/publicsuffixes.gz"
+      ]
+    }
+  },
+  "total_detected": 1,
+  "native_libraries": [],
+  "native_architectures": [],
+  "uses_kotlin": true,
+  "uses_jetpack_compose": false
+}

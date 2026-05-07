@@ -1,0 +1,63 @@
+{
+  "total_services": 23,
+  "services": [
+    "androidx.appcompat.app.AppLocalesMetadataHolderService",
+    "androidx.credentials.playservices.CredentialProviderMetadataHolder",
+    "androidx.room.MultiInstanceInvalidationService",
+    "androidx.work.impl.background.systemalarm.SystemAlarmService",
+    "androidx.work.impl.background.systemjob.SystemJobService",
+    "androidx.work.impl.foreground.SystemForegroundService",
+    "com.google.android.datatransport.runtime.backends.TransportBackendDiscovery",
+    "com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService",
+    "com.google.android.gms.auth.api.signin.RevocationBoundService",
+    "com.google.android.gms.measurement.AppMeasurementJobService",
+    "com.google.android.gms.measurement.AppMeasurementService",
+    "com.google.android.gms.tagmanager.TagManagerService",
+    "com.google.firebase.components.ComponentDiscoveryService",
+    "com.google.firebase.messaging.FirebaseMessagingService",
+    "com.google.firebase.sessions.SessionLifecycleService",
+    "com.heavyplayer.audioplayerrecorder.service.AudioRecorderService",
+    "com.todoist.appwidget.service.ItemListAppWidgetService",
+    "com.todoist.appwidget.service.ItemListRemoteViewsService",
+    "com.todoist.attachment.audio.service.AudioPlayerMediaProxyService",
+    "com.todoist.notification.component.LiveNotificationQuickReplyService",
+    "com.todoist.pushnotifications.FcmListenerService",
+    "com.todoist.quicksettings.CreateItemTileService",
+    "com.todoist.util.CompletionSoundService"
+  ],
+  "categorized": {
+    "other": [
+      "com.todoist.attachment.audio.service.AudioPlayerMediaProxyService",
+      "com.google.android.gms.tagmanager.TagManagerService",
+      "com.todoist.quicksettings.CreateItemTileService",
+      "com.google.firebase.sessions.SessionLifecycleService",
+      "com.google.android.gms.auth.api.signin.RevocationBoundService",
+      "androidx.work.impl.background.systemjob.SystemJobService",
+      "com.google.android.gms.measurement.AppMeasurementService",
+      "androidx.room.MultiInstanceInvalidationService",
+      "com.google.android.gms.measurement.AppMeasurementJobService",
+      "com.google.firebase.components.ComponentDiscoveryService",
+      "androidx.work.impl.foreground.SystemForegroundService",
+      "com.todoist.util.CompletionSoundService",
+      "com.google.android.datatransport.runtime.backends.TransportBackendDiscovery",
+      "com.heavyplayer.audioplayerrecorder.service.AudioRecorderService",
+      "com.todoist.appwidget.service.ItemListRemoteViewsService"
+    ],
+    "widgets": [
+      "com.todoist.appwidget.service.ItemListAppWidgetService"
+    ],
+    "sync": [
+      "androidx.appcompat.app.AppLocalesMetadataHolderService",
+      "androidx.credentials.playservices.CredentialProviderMetadataHolder"
+    ],
+    "notifications": [
+      "com.google.firebase.messaging.FirebaseMessagingService",
+      "com.todoist.pushnotifications.FcmListenerService",
+      "com.todoist.notification.component.LiveNotificationQuickReplyService"
+    ],
+    "reminders": [
+      "androidx.work.impl.background.systemalarm.SystemAlarmService",
+      "com.google.android.datatransport.runtime.scheduling.jobscheduling.JobInfoSchedulerService"
+    ]
+  }
+}
