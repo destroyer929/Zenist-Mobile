@@ -8,13 +8,30 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "plugins": [
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Zenist needs access to your microphone for voice commands.",
+          "speechRecognitionPermission": "Zenist needs access to speech recognition for voice commands.",
+          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
+        }
+      ]
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Zenist uses speech recognition for voice commands.",
+        "NSMicrophoneUsageDescription": "Zenist needs your microphone for voice commands."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0a0b10"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     }
   }
 }

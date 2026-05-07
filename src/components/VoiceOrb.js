@@ -5,12 +5,16 @@ import { BlurView } from 'expo-blur';
 import { Mic, Loader2, Sparkles, CheckCircle2, AudioLines } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
 import { useTheme } from '../context/ThemeContext';
 import { useTasks } from '../context/TaskContext';
-import { processAudioCommand } from '../services/VoiceAssistant';
-import { useAudioRecorder, AudioModule, RecordingPresets, setAudioModeAsync } from 'expo-audio';
+import { parseVoiceCommand } from '../utils/nlpParser';
 import { nanoid } from 'nanoid/non-secure';
 
+// ─── Simulation Overlay (unchanged) ─────────────────────────────
 const SimulationOverlay = ({ intent, onComplete, colors, isDark }) => {
   const [step, setStep] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -23,15 +27,15 @@ const SimulationOverlay = ({ intent, onComplete, colors, isDark }) => {
     const runSimulation = async () => {
       await new Promise(r => setTimeout(r, 600));
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setStep(1); // Extract Task
+      setStep(1);
       
       await new Promise(r => setTimeout(r, 600));
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setStep(2); // Extract Project
+      setStep(2);
       
       await new Promise(r => setTimeout(r, 600));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setStep(3); // Complete
+      setStep(3);
       
       await new Promise(r => setTimeout(r, 1200));
       
@@ -71,7 +75,7 @@ const SimulationOverlay = ({ intent, onComplete, colors, isDark }) => {
             </View>
             
             <Text style={[styles.simTitle, { color: isDark ? '#fff' : '#000' }]}>
-              {step === 0 ? sim.title + "..." : "AI Analysis Complete"}
+              {step === 0 ? sim.title + "..." : "Analysis Complete"}
             </Text>
 
             <View style={styles.simStepsContainer}>
@@ -99,22 +103,80 @@ const SimulationOverlay = ({ intent, onComplete, colors, isDark }) => {
   );
 };
 
+// ─── Main Voice Orb ─────────────────────────────────────────────
 const VoiceOrb = () => {
   const navigation = useNavigation();
   const { colors, isDark, setThemeMode } = useTheme();
   const { tasks, addTask, toggleTask, deleteTask, updateTask, clearTasks } = useTasks();
   
+  const [isListening, setIsListening] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingStatus, setRecordingStatus] = useState('');
+  const [transcript, setTranscript] = useState('');
   const [simulationIntent, setSimulationIntent] = useState(null);
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const outerPulseAnim = useRef(new Animated.Value(1)).current;
   const backdropFade = useRef(new Animated.Value(0)).current;
 
-  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-  const isRecording = audioRecorder.isRecording;
+  // ─── Speech Recognition Events ──────────────────────────────
+  useSpeechRecognitionEvent('start', () => {
+    setIsListening(true);
+    setTranscript('');
+    setRecordingStatus('Listening...');
+    startPulse();
+  });
 
+  useSpeechRecognitionEvent('result', (event) => {
+    const currentTranscript = event.results[event.results.length - 1]?.transcript || '';
+    setTranscript(currentTranscript);
+    setRecordingStatus(currentTranscript || 'Listening...');
+  });
+
+  useSpeechRecognitionEvent('end', () => {
+    setIsListening(false);
+    stopPulse();
+    
+    if (transcript && transcript.trim().length > 0) {
+      setIsProcessing(true);
+      setRecordingStatus('Processing...');
+      
+      // Use the local parser instead of LLM
+      const intent = parseVoiceCommand(transcript, tasks);
+      console.log('Local parser result:', JSON.stringify(intent, null, 2));
+      
+      if (intent && intent.action !== 'UNKNOWN') {
+        executeIntent(intent);
+      } else {
+        Speech.speak(intent?.responseSpeech || "I didn't understand that.", { rate: 1.0, pitch: 1.0 });
+        setRecordingStatus(intent?.responseSpeech || "I didn't understand.");
+        setTimeout(() => setRecordingStatus(''), 3000);
+      }
+      
+      setIsProcessing(false);
+    } else {
+      setRecordingStatus("I didn't catch that, try again.");
+      Speech.speak("I didn't catch that, try again.", { rate: 1.0, pitch: 1.0 });
+      setTimeout(() => setRecordingStatus(''), 3000);
+    }
+  });
+
+  useSpeechRecognitionEvent('error', (event) => {
+    console.log('Speech recognition error:', event.error, event.message);
+    setIsListening(false);
+    stopPulse();
+    setIsProcessing(false);
+    
+    if (event.error === 'no-speech') {
+      setRecordingStatus("I didn't hear anything.");
+      Speech.speak("I didn't hear anything, try again.", { rate: 1.0, pitch: 1.0 });
+    } else {
+      setRecordingStatus('Voice error. Try again.');
+    }
+    setTimeout(() => setRecordingStatus(''), 3000);
+  });
+
+  // ─── Animations ─────────────────────────────────────────────
   const startPulse = () => {
     Animated.parallel([
       Animated.loop(
@@ -143,118 +205,107 @@ const VoiceOrb = () => {
     ]).start();
   };
 
+  // ─── Toggle Recording ───────────────────────────────────────
   const toggleRecording = async () => {
-    if (isRecording) {
-      // Stop Recording
-      stopPulse();
+    if (isListening) {
+      // Stop listening
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setIsProcessing(true);
-      setRecordingStatus('Thinking...');
-      
-      await audioRecorder.stop();
-      const uri = audioRecorder.url || audioRecorder.uri;
-      
-      if (uri) {
-        const intent = await processAudioCommand(uri, tasks);
-        if (intent) {
-          executeIntent(intent);
-        } else {
-          setRecordingStatus('Could not understand.');
-          setTimeout(() => setRecordingStatus(''), 2000);
-        }
-      } else {
-        setRecordingStatus('Recording failed.');
-        setTimeout(() => setRecordingStatus(''), 2000);
+      try {
+        ExpoSpeechRecognitionModule.stop();
+      } catch (e) {
+        console.log('Stop error:', e);
       }
-      
-      setIsProcessing(false);
     } else {
-      // Start Recording
+      // Start listening
       if (isProcessing) return;
-
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      
-      const perm = await AudioModule.requestRecordingPermissionsAsync();
-      if (perm.status !== 'granted') {
+
+      const result = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!result.granted) {
         setRecordingStatus('Mic permission denied');
+        Speech.speak("Microphone permission denied.", { rate: 1.0, pitch: 1.0 });
         setTimeout(() => setRecordingStatus(''), 2000);
         return;
       }
 
       try {
-        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-        await audioRecorder.prepareToRecordAsync();
-        setRecordingStatus('Listening...');
-        startPulse();
-        audioRecorder.record();
+        ExpoSpeechRecognitionModule.start({
+          lang: 'en-US',
+          interimResults: true,
+          maxAlternatives: 1,
+          requiresOnDeviceRecognition: false, // Falls back to cloud if on-device unavailable
+          addsPunctuation: false,
+        });
       } catch (err) {
-        setRecordingStatus('Recording error');
-        setTimeout(() => setRecordingStatus(''), 2000);
+        console.log('Start error:', err);
+        setRecordingStatus('Speech recognition unavailable.');
+        Speech.speak("Speech recognition is not available on this device.", { rate: 1.0, pitch: 1.0 });
+        setTimeout(() => setRecordingStatus(''), 3000);
       }
     }
   };
 
+  // ─── Execute Intent ─────────────────────────────────────────
   const executeIntent = (intent) => {
-    // For general actions that don't need a search (ADD, CLEAR, etc.)
-    const immediateSpeechActions = ['ADD_TASK', 'UPDATE_TASK', 'CLEAR_ALL', 'SEARCH', 'CHANGE_THEME', 'NAVIGATE'];
+    // Actions that go through the SimulationOverlay
+    const simulatedActions = ['ADD_TASK', 'UPDATE_TASK', 'CLEAR_ALL', 'SEARCH', 'CHANGE_THEME', 'NAVIGATE'];
     
-    if (immediateSpeechActions.includes(intent.action) && intent.responseSpeech) {
-      Speech.speak(intent.responseSpeech, { rate: 1.0, pitch: 1.0 });
-    }
-
-    if (immediateSpeechActions.includes(intent.action)) {
+    if (simulatedActions.includes(intent.action)) {
+      if (intent.responseSpeech) {
+        Speech.speak(intent.responseSpeech, { rate: 1.0, pitch: 1.0 });
+      }
       setRecordingStatus('');
-      setSimulationIntent(intent); // Triggers the visual overlay
+      setSimulationIntent(intent);
     } 
+    // LIST actions — just speak, no state change
+    else if (intent.action === 'LIST_TASKS' || intent.action === 'LIST_SUBTASKS') {
+      if (intent.responseSpeech) {
+        Speech.speak(intent.responseSpeech, { rate: 1.0, pitch: 1.0 });
+      }
+      setRecordingStatus(intent.responseSpeech || '');
+      setTimeout(() => setRecordingStatus(''), 5000);
+    }
+    // TOGGLE / DELETE — immediate action
     else if (intent.action === 'TOGGLE_TASK' || intent.action === 'DELETE_TASK') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
-      // 1. Try to find a top-level task
       let target = tasks.find(t => t.title.toLowerCase().includes(intent.title.toLowerCase()));
       
       if (target) {
-        // SPEAK SUCCESS RESPONSE ONLY NOW
-        if (intent.responseSpeech) {
-          Speech.speak(intent.responseSpeech, { rate: 1.0, pitch: 1.0 });
-        }
-
         if (intent.action === 'TOGGLE_TASK') {
           if (intent.subtasks && intent.subtasks.length > 0) {
-            // Toggle specific subtasks within this parent task
             const newSubtasks = [...(target.subtasks || [])];
-            // Deduplicate subtasks to prevent double-toggling
             const uniqueSubtasks = [...new Set(intent.subtasks.map(s => s.toLowerCase().trim()))];
             
             uniqueSubtasks.forEach(subTitle => {
               const subIdx = newSubtasks.findIndex(s => s.title.toLowerCase().trim().includes(subTitle));
               if (subIdx > -1) {
-                // Instead of always toggling, we try to be smart. 
-                // If the user said "Complete", they likely want them true. 
-                // For now, toggle is fine but unique ensures we don't flip back.
                 newSubtasks[subIdx] = { ...newSubtasks[subIdx], completed: !newSubtasks[subIdx].completed };
               }
             });
 
-            // Auto-complete parent if all subtasks are done
             const allDone = newSubtasks.length > 0 && newSubtasks.every(s => s.completed);
             updateTask(target.id, { 
               subtasks: newSubtasks, 
               completed: allDone,
               completedAt: allDone ? new Date().toISOString() : null 
             });
+            
+            if (intent.responseSpeech) Speech.speak(intent.responseSpeech, { rate: 1.0, pitch: 1.0 });
             setRecordingStatus(`✅ Updated subtasks for: ${target.title}${allDone ? ' (Task Done!)' : ''}`);
           } else {
-            // Toggle the whole task
             toggleTask(target.id);
+            if (intent.responseSpeech) Speech.speak(intent.responseSpeech, { rate: 1.0, pitch: 1.0 });
             setRecordingStatus(`✅ Toggled: ${target.title}`);
           }
         }
         if (intent.action === 'DELETE_TASK') {
           deleteTask(target.id);
+          if (intent.responseSpeech) Speech.speak(intent.responseSpeech, { rate: 1.0, pitch: 1.0 });
           setRecordingStatus(`🗑 Deleted: ${target.title}`);
         }
       } else if (intent.action === 'TOGGLE_TASK') {
-        // 2. Try to find a subtask globally if it's a TOGGLE action and no parent matched
+        // Try to find a subtask globally
         let foundSubtask = false;
         for (const task of tasks) {
           if (task.subtasks) {
@@ -263,13 +314,9 @@ const VoiceOrb = () => {
               const newSubtasks = [...task.subtasks];
               newSubtasks[subIdx] = { ...newSubtasks[subIdx], completed: !newSubtasks[subIdx].completed };
               updateTask(task.id, { subtasks: newSubtasks });
+              
+              if (intent.responseSpeech) Speech.speak(intent.responseSpeech, { rate: 1.0, pitch: 1.0 });
               setRecordingStatus(`✅ Toggled Subtask: ${newSubtasks[subIdx].title}`);
-              
-              // SPEAK SUCCESS RESPONSE ONLY NOW
-              if (intent.responseSpeech) {
-                Speech.speak(intent.responseSpeech, { rate: 1.0, pitch: 1.0 });
-              }
-              
               foundSubtask = true;
               break;
             }
@@ -278,30 +325,29 @@ const VoiceOrb = () => {
         
         if (!foundSubtask) {
           setRecordingStatus(`Could not find: ${intent.title}`);
-          Speech.stop();
-          Speech.speak("Am sorry I couldn't do it", { rate: 1.0, pitch: 1.0 });
+          Speech.speak("Am sorry I couldn't find that task.", { rate: 1.0, pitch: 1.0 });
         }
       } else {
         setRecordingStatus(`Could not find: ${intent.title}`);
-        Speech.stop();
-        Speech.speak("Am sorry I couldn't do it", { rate: 1.0, pitch: 1.0 });
+        Speech.speak("Am sorry I couldn't find that task.", { rate: 1.0, pitch: 1.0 });
       }
       setTimeout(() => setRecordingStatus(''), 3000);
     } else {
-      setRecordingStatus('Command not recognized.');
+      setRecordingStatus(intent.responseSpeech || 'Command not recognized.');
       if (intent.responseSpeech) {
-         Speech.speak(intent.responseSpeech, { rate: 1.0, pitch: 1.0 });
+        Speech.speak(intent.responseSpeech, { rate: 1.0, pitch: 1.0 });
       }
       setTimeout(() => setRecordingStatus(''), 3000);
     }
   };
 
+  // ─── Simulation Complete Handler ────────────────────────────
   const handleSimulationComplete = () => {
     let subtasks = [];
     if (simulationIntent.subtasks && Array.isArray(simulationIntent.subtasks)) {
       subtasks = simulationIntent.subtasks.map(s => ({
         id: nanoid(),
-        title: s,
+        title: typeof s === 'string' ? s : s.title || s,
         completed: false
       }));
     }
@@ -334,7 +380,7 @@ const VoiceOrb = () => {
       if (simulationIntent.screen) {
         const sc = simulationIntent.screen.toLowerCase();
         if (sc.includes('project')) route = 'Projects';
-        else if (sc.includes('upcoming')) route = 'Upcoming';
+        else if (sc.includes('timeline') || sc.includes('upcoming')) route = 'Timeline';
         else if (sc.includes('profile')) route = 'Profile';
         else if (sc.includes('search')) route = 'Search';
       }
@@ -343,6 +389,7 @@ const VoiceOrb = () => {
     setSimulationIntent(null);
   };
 
+  // ─── Render ─────────────────────────────────────────────────
   return (
     <>
       {simulationIntent && (
@@ -379,17 +426,17 @@ const VoiceOrb = () => {
 
         {/* Central Listening Text */}
         <Animated.View style={[styles.centerListeningContent, { opacity: backdropFade }]} pointerEvents="none">
-          <AudioLines color={isRecording ? '#ff3b30' : colors.gold} size={48} />
+          <AudioLines color={isListening ? '#ff3b30' : colors.gold} size={48} />
           <Text style={[styles.centerListeningText, { color: isDark ? '#fff' : '#000' }]}>
-            {isRecording ? "Listening..." : "Synthesizing..."}
+            {isListening ? "Listening..." : "Processing..."}
           </Text>
           <Text style={[styles.centerListeningSub, { color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }]}>
-            {isRecording ? "Tap to send command" : "Processing your voice"}
+            {isListening ? (transcript || "Tap to send command") : "Analyzing your voice"}
           </Text>
         </Animated.View>
 
         {/* Status Toast */}
-        {recordingStatus !== '' && !isRecording && !isProcessing && (
+        {recordingStatus !== '' && !isListening && !isProcessing && (
           <Animated.View style={[styles.statusToast, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.8)' }]}>
             <BlurView intensity={20} tint="dark" style={styles.statusBlur}>
               <Text style={[styles.statusText, { color: isDark ? colors.textWhite : '#fff' }]}>{recordingStatus}</Text>
@@ -403,11 +450,11 @@ const VoiceOrb = () => {
             <Animated.View style={[
               styles.glowLayer, 
               { 
-                backgroundColor: isRecording ? '#ff3b30' : colors.gold,
+                backgroundColor: isListening ? '#ff3b30' : colors.gold,
                 transform: [{ scale: outerPulseAnim }],
                 opacity: outerPulseAnim.interpolate({
                   inputRange: [1, 2],
-                  outputRange: [isRecording ? 0.4 : 0.2, 0]
+                  outputRange: [isListening ? 0.4 : 0.2, 0]
                 })
               }
             ]} />
@@ -415,24 +462,24 @@ const VoiceOrb = () => {
             <Animated.View style={[
               styles.glowLayer, 
               { 
-                backgroundColor: isRecording ? '#ff3b30' : colors.gold,
+                backgroundColor: isListening ? '#ff3b30' : colors.gold,
                 transform: [{ scale: pulseAnim }],
-                opacity: isRecording ? 0.6 : 0.3
+                opacity: isListening ? 0.6 : 0.3
               }
             ]} />
             
             {/* Core Orb */}
             <View style={[
               styles.orb, 
-              { backgroundColor: isRecording ? '#ff3b30' : (isProcessing ? colors.gold : colors.cardBg),
-                borderColor: isProcessing ? colors.gold : (isRecording ? '#ff3b30' : colors.glassBorder),
+              { backgroundColor: isListening ? '#ff3b30' : (isProcessing ? colors.gold : colors.cardBg),
+                borderColor: isProcessing ? colors.gold : (isListening ? '#ff3b30' : colors.glassBorder),
                 borderWidth: 1
               }
             ]}>
               {isProcessing ? (
                 <Loader2 color={isDark ? colors.bgDeep : '#fff'} size={24} />
               ) : (
-                <Mic color={isRecording ? '#fff' : (isDark ? colors.textWhite : '#000')} size={24} />
+                <Mic color={isListening ? '#fff' : (isDark ? colors.textWhite : '#000')} size={24} />
               )}
             </View>
           </Pressable>
@@ -442,12 +489,13 @@ const VoiceOrb = () => {
   );
 };
 
+// ─── Styles ─────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { ...StyleSheet.absoluteFillObject, zIndex: 1000 },
   orbContainer: { position: 'absolute', bottom: 110, right: 24, alignItems: 'center' },
   centerListeningContent: { position: 'absolute', top: '40%', left: 0, right: 0, alignItems: 'center', justifyContent: 'center' },
   centerListeningText: { fontSize: 28, fontWeight: '800', marginTop: 24, letterSpacing: 0.5 },
-  centerListeningSub: { fontSize: 16, fontWeight: '500', marginTop: 8, opacity: 0.8 },
+  centerListeningSub: { fontSize: 16, fontWeight: '500', marginTop: 8, opacity: 0.8, textAlign: 'center', paddingHorizontal: 40 },
   blob: { position: 'absolute', width: 300, height: 300, borderRadius: 150, opacity: 0.6, filter: [{ blur: 40 }] },
   statusToast: { position: 'absolute', bottom: 190, right: 24, borderRadius: 16, overflow: 'hidden', width: 200 },
   statusBlur: { paddingHorizontal: 16, paddingVertical: 10, alignItems: 'center' },
